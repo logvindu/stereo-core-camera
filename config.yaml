@@ -1,0 +1,54 @@
+camera:
+  # Camera configuration
+  resolution: [3280, 2464]  # IMX219 max resolution
+  format: "RGB888"
+  framerate: 15
+  
+  # Stereo camera setup
+  camera_0_id: 0  # Left camera
+  camera_1_id: 1  # Right camera
+  
+  # Exposure settings
+  exposure_modes: ["auto", "manual"]
+  default_exposure: "auto"
+  exposure_range: [100, 800000]  # microseconds
+  
+  # Focus settings (if supported)
+  autofocus_enabled: false
+  focus_range: [0, 1023]
+
+ui:
+  # Main window settings
+  window_title: "Stereo Core Camera System"
+  window_size: [800, 600]
+  fullscreen: true
+  
+  # Workflow settings
+  default_segment_length: 0.5  # meters
+  segment_adjustment_step: 0.05  # meters
+  
+  # Preview settings
+  preview_size: [640, 480]
+  preview_timeout: 30  # seconds
+
+storage:
+  # Internal storage path
+  internal_path: "/home/pi/core_photos"
+  
+  # USB mount detection
+  usb_mount_paths:
+    - "/media/pi"
+    - "/mnt/usb"
+  
+  # Storage warning thresholds (MB)
+  low_space_warning: 1000
+  critical_space_warning: 500
+  
+  # File format
+  image_format: "JPEG"
+  image_quality: 95
+
+logging:
+  level: "INFO"
+  file: "/home/pi/stereo_camera.log"
+  max_size_mb: 10 
