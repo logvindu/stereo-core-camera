@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QTextEdit, QProgressBar,
     QMessageBox, QDialog, QFrame, QSizePolicy
 )
-from PySide6.QtCore import Qt, QTimer, Signal, QThread, pyqtSignal
+from PySide6.QtCore import Qt, QTimer, Signal, QThread
 from PySide6.QtGui import QPixmap, QImage, QFont, QPalette, QColor
 
 from ..camera import StereoCamera
@@ -24,7 +24,7 @@ from .focus_dialog import FocusDialog
 class PreviewUpdateThread(QThread):
     """Thread for updating camera preview without blocking UI."""
     
-    frame_ready = pyqtSignal(np.ndarray)
+    frame_ready = Signal(np.ndarray)
     
     def __init__(self, camera: StereoCamera):
         super().__init__()
