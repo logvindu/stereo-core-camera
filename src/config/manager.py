@@ -161,10 +161,14 @@ class ConfigManager:
         """Validate storage configuration section."""
         # Validate paths
         if not storage_config.get('internal_path'):
-            storage_config['internal_path'] = "/home/pi/core_photos"
+            import os
+            home_dir = os.path.expanduser("~")
+            storage_config['internal_path'] = f"{home_dir}/core_photos"
         
         if not isinstance(storage_config.get('usb_mount_paths'), list):
-            storage_config['usb_mount_paths'] = ["/media/pi", "/mnt/usb"]
+            import os
+            username = os.environ.get('USER', 'pi')
+            storage_config['usb_mount_paths'] = [f"/media/{username}", "/mnt/usb"]
         
         # Validate warning thresholds
         for key, default_value in [
@@ -181,6 +185,7 @@ class ConfigManager:
         Get default configuration values.
         Returns: Default configuration dictionary
         """
+        import os
         return {
             'camera': {
                 'resolution': [3280, 2464],
@@ -204,8 +209,8 @@ class ConfigManager:
                 'preview_timeout': 30
             },
             'storage': {
-                'internal_path': "/home/pi/core_photos",
-                'usb_mount_paths': ["/media/pi", "/mnt/usb"],
+                'internal_path': f"{os.path.expanduser('~')}/core_photos",
+                'usb_mount_paths': [f"/media/{os.environ.get('USER', 'pi')}", "/mnt/usb"],
                 'low_space_warning': 1000,
                 'critical_space_warning': 500,
                 'image_format': "JPEG",
@@ -213,7 +218,7 @@ class ConfigManager:
             },
             'logging': {
                 'level': "INFO",
-                'file': "/home/pi/stereo_camera.log",
+                'file': f"{os.path.expanduser('~')}/stereo_camera.log",
                 'max_size_mb': 10
             }
         } 

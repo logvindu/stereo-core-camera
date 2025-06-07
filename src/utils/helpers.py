@@ -62,7 +62,9 @@ def create_directories(config: Dict[str, Any]) -> None:
     Create necessary directories for the application.
     """
     # Create internal storage directory
-    internal_path = config.get('storage', {}).get('internal_path', '/home/pi/core_photos')
+    import os
+    default_path = os.path.expanduser('~/core_photos')
+    internal_path = config.get('storage', {}).get('internal_path', default_path)
     Path(internal_path).mkdir(parents=True, exist_ok=True)
     
     # Create log directory
