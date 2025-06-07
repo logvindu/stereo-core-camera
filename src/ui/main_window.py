@@ -667,7 +667,8 @@ class MainWindow(QMainWindow):
         
         # Scroll to bottom
         cursor = self.status_text.textCursor()
-        cursor.movePosition(cursor.End)
+        from PySide6.QtGui import QTextCursor
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         self.status_text.setTextCursor(cursor)
     
     def _show_error(self, message: str):
