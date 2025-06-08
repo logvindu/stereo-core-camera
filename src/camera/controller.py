@@ -145,38 +145,46 @@ class StereoCamera:
     def _configure_camera(self, camera: Any, name: str) -> None:
         """Configure a single camera with optimal settings."""
         try:
-            # For OV64A40 cameras, try the most basic configuration possible
-            # Based on libcamera documentation for OV64A40
-            config = {
-                "main": {
-                    "size": (640, 480),
-                    "format": "RGB888"
-                }
-            }
+            # For OV64A40 cameras, use Picamera2's create_still_configuration method
+            # This automatically creates the proper structure with 'main' and 'raw' keys
+            self.logger.info(f"Creating configuration for {name}")
             
-            self.logger.info(f"Attempting to configure {name} with config: {config}")
+            config = camera.create_still_configuration(
+                main={"size": (640, 480), "format": "RGB888"}
+            )
+            
+            self.logger.info(f"Attempting to configure {name} with still config")
             camera.configure(config)
             self.logger.info(f"{name} configured successfully with RGB888 format")
             
         except Exception as e:
-            self.logger.error(f"RGB888 configuration failed for {name}: {e}")
+            self.logger.error(f"Still configuration failed for {name}: {e}")
             
-            # Fallback to even simpler configuration
+            # Fallback to preview configuration
             try:
-                self.logger.info(f"Trying fallback configuration for {name}")
-                fallback_config = {
-                    "main": {
-                        "size": (640, 480)
-                    }
-                }
+                self.logger.info(f"Trying preview configuration for {name}")
                 
-                self.logger.info(f"Fallback config for {name}: {fallback_config}")
-                camera.configure(fallback_config)
-                self.logger.info(f"{name} configured with fallback configuration")
+                config = camera.create_preview_configuration(
+                    main={"size": (640, 480)}
+                )
+                
+                self.logger.info(f"Preview config for {name}: {config}")
+                camera.configure(config)
+                self.logger.info(f"{name} configured with preview configuration")
                 
             except Exception as fallback_error:
-                self.logger.error(f"Fallback configuration also failed for {name}: {fallback_error}")
-                raise
+                self.logger.error(f"Preview configuration also failed for {name}: {fallback_error}")
+                
+                # Last resort: try default configuration
+                try:
+                    self.logger.info(f"Trying default configuration for {name}")
+                    config = camera.create_preview_configuration()
+                    camera.configure(config)
+                    self.logger.info(f"{name} configured with default configuration")
+                    
+                except Exception as default_error:
+                    self.logger.error(f"All configuration methods failed for {name}: {default_error}")
+                    raise
     
     def is_initialized(self) -> bool:
         """Check if cameras are initialized."""
