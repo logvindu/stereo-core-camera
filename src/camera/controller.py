@@ -122,16 +122,10 @@ class StereoCamera:
     
     def _configure_camera(self, camera: Any, name: str) -> None:
         """Configure a single camera with optimal settings."""
-        # For OV64A40 cameras, use simpler configuration
+        # For OV64A40 cameras, use minimal configuration
         config = {
             "main": {
                 "size": self.resolution
-            },
-            "lores": {
-                "size": (640, 480)
-            },
-            "controls": {
-                "FrameRate": self.framerate
             }
         }
         
@@ -297,20 +291,16 @@ class StereoCamera:
             # Select camera based on index
             camera = self.camera_0 if camera_index == 0 else self.camera_1
             
-            # Get low-res preview from selected camera
+            # Get preview from main sensor
             if hasattr(camera, 'capture_array'):
-                try:
-                    # Try to get low-res preview first
-                    preview = camera.capture_array("lores")
-                except Exception:
-                    # Fall back to main sensor with resize
-                    preview = camera.capture_array()
-                    if preview is not None:
-                        # Resize for preview performance
-                        from PIL import Image
-                        img = Image.fromarray(preview)
-                        img.thumbnail((640, 480))
-                        preview = np.array(img)
+                # Get main sensor preview
+                preview = camera.capture_array()
+                if preview is not None:
+                    # Resize for preview performance
+                    from PIL import Image
+                    img = Image.fromarray(preview)
+                    img.thumbnail((640, 480))
+                    preview = np.array(img)
             else:
                 # Mock camera
                 preview = camera.capture_array()
