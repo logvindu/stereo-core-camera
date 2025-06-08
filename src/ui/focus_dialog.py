@@ -135,7 +135,7 @@ class FocusDialog(QDialog):
         controls_layout = QVBoxLayout(controls_frame)
         
         # Instructions
-        instructions = QLabel("Use + and - buttons to adjust focus for the selected camera")
+        instructions = QLabel("Use + and - buttons to adjust focus (8 discrete steps: 0-7)\nfor the selected camera")
         instructions.setAlignment(Qt.AlignCenter)
         instructions.setFont(QFont("Arial", 11))
         controls_layout.addWidget(instructions)
@@ -152,7 +152,7 @@ class FocusDialog(QDialog):
         self.focus_plus_button.clicked.connect(self._on_focus_increase)
         
         # Focus status
-        self.focus_status_label = QLabel("Focus: 500")
+        self.focus_status_label = QLabel("Focus Step: 3/7")
         self.focus_status_label.setAlignment(Qt.AlignCenter)
         self.focus_status_label.setFont(QFont("Arial", 12, QFont.Bold))
         
@@ -233,8 +233,14 @@ class FocusDialog(QDialog):
         """Start live preview update."""
         if self.camera and self.camera.is_initialized():
             self.preview_timer.start(100)  # 10 FPS
+            # Initialize focus status display
+            if hasattr(self.camera, 'get_focus_step'):
+                focus_step = self.camera.get_focus_step(self.current_camera)
+                self.focus_status_label.setText(f"Focus Step: {focus_step}/7")
         else:
             self.preview_label.setText("Camera not available\n(Running in development mode)")
+            # Show default focus status for development mode
+            self.focus_status_label.setText("Focus Step: 3/7 (Dev Mode)")
             
     def _stop_preview(self):
         """Stop live preview update."""
@@ -280,27 +286,45 @@ class FocusDialog(QDialog):
         self.current_camera = self.camera_button_group.id(button)
         camera_name = "Camera 1" if self.current_camera == 0 else "Camera 2"
         self.preview_title.setText(f"Live Preview - {camera_name}")
+        
+        # Update focus status for the selected camera
+        if self.camera and hasattr(self.camera, 'get_focus_step'):
+            focus_step = self.camera.get_focus_step(self.current_camera)
+            self.focus_status_label.setText(f"Focus Step: {focus_step}/7")
+        
         self.logger.info(f"Focus mode switched to {camera_name}")
         
     def _on_focus_increase(self):
         """Handle focus increase button."""
-        if self.camera:
+        if self.camera and hasattr(self.camera, 'adjust_focus'):
             success = self.camera.adjust_focus("increase", self.current_camera)
             if success:
                 # Update focus status
-                focus_value = getattr(self.camera, 'current_focus', 500)
-                self.focus_status_label.setText(f"Focus: {focus_value}")
-                self.logger.info(f"Focus increased for Camera {self.current_camera + 1}")
+                focus_step = self.camera.get_focus_step(self.current_camera)
+                self.focus_status_label.setText(f"Focus Step: {focus_step}/7")
+                self.logger.info(f"Focus increased for Camera {self.current_camera + 1} to step {focus_step}")
+            else:
+                # Update status anyway to show current value
+                focus_step = self.camera.get_focus_step(self.current_camera)
+                self.focus_status_label.setText(f"Focus Step: {focus_step}/7 (Max)")
+        else:
+            self.logger.info("Focus increase - Camera not available (development mode)")
             
     def _on_focus_decrease(self):
         """Handle focus decrease button."""
-        if self.camera:
+        if self.camera and hasattr(self.camera, 'adjust_focus'):
             success = self.camera.adjust_focus("decrease", self.current_camera)
             if success:
                 # Update focus status
-                focus_value = getattr(self.camera, 'current_focus', 500)
-                self.focus_status_label.setText(f"Focus: {focus_value}")
-                self.logger.info(f"Focus decreased for Camera {self.current_camera + 1}")
+                focus_step = self.camera.get_focus_step(self.current_camera)
+                self.focus_status_label.setText(f"Focus Step: {focus_step}/7")
+                self.logger.info(f"Focus decreased for Camera {self.current_camera + 1} to step {focus_step}")
+            else:
+                # Update status anyway to show current value
+                focus_step = self.camera.get_focus_step(self.current_camera)
+                self.focus_status_label.setText(f"Focus Step: {focus_step}/7 (Min)")
+        else:
+            self.logger.info("Focus decrease - Camera not available (development mode)")
                 
     def exec(self):
         """Execute the dialog."""

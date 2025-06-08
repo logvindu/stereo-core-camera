@@ -27,6 +27,7 @@ class MockCamera:
     def __init__(self, camera_id: int):
         self.camera_id = camera_id
         self._running = False
+        self._focus_position = 500  # Mock focus position
         
     def configure(self, config: Dict[str, Any]) -> None:
         pass
@@ -47,7 +48,10 @@ class MockCamera:
         img.save(filename)
         
     def set_controls(self, controls: Dict[str, Any]) -> None:
-        pass
+        # Mock focus control simulation
+        if "LensPosition" in controls:
+            self._focus_position = controls["LensPosition"]
+            print(f"MockCamera {self.camera_id}: Focus set to {self._focus_position}")
 
 
 class StereoCamera:
@@ -74,9 +78,12 @@ class StereoCamera:
         self.current_exposure_mode = config['camera']['default_exposure']
         self.manual_exposure_time = 10000  # microseconds
         
-        # Focus settings
-        self.focus_range = config['camera']['focus_range']
-        self.current_focus = 500  # Middle of range
+        # Focus settings for IMX219 - 8 discrete steps (0-7)
+        self.focus_steps = config['camera'].get('focus_steps', 8)  # Total number of discrete focus positions
+        default_step = config['camera'].get('default_focus_step', 3)
+        self.focus_step_0 = default_step  # Starting focus step for camera 0
+        self.focus_step_1 = default_step  # Starting focus step for camera 1
+        self.focus_range = config['camera']['focus_range']  # Continuous range for API mapping
         
         # Camera instances
         self.camera_0: Optional[Picamera2] = None
@@ -286,36 +293,42 @@ class StereoCamera:
     
     def adjust_focus(self, direction: str, camera_index: int = 0) -> bool:
         """
-        Adjust focus for specified camera.
+        Adjust focus for specified camera using discrete steps (0-7).
         Args:
             direction: 'increase' or 'decrease'
             camera_index: 0 for camera_0 (left), 1 for camera_1 (right)
         Returns: success status
         """
-        if not self._initialized:
-            return False
-            
         try:
             with self._lock:
-                step = 50  # Focus step size
+                # Select the appropriate focus step variable
+                current_step = self.focus_step_0 if camera_index == 0 else self.focus_step_1
                 
                 if direction == 'increase':
-                    self.current_focus = min(
-                        self.current_focus + step,
-                        self.focus_range[1]
-                    )
+                    new_step = min(current_step + 1, self.focus_steps - 1)  # Max step is 7
                 elif direction == 'decrease':
-                    self.current_focus = max(
-                        self.current_focus - step,
-                        self.focus_range[0]
-                    )
+                    new_step = max(current_step - 1, 0)  # Min step is 0
                 else:
                     return False
                 
-                # Apply focus to specified camera
-                focus_controls = {"LensPosition": self.current_focus}
+                # Check if step actually changed (boundary condition)
+                if new_step == current_step:
+                    self.logger.info(f"Focus at boundary for camera {camera_index}: step {current_step}")
+                    return False  # No change made
                 
-                if Picamera2 and controls:
+                # Update the appropriate step variable
+                if camera_index == 0:
+                    self.focus_step_0 = new_step
+                else:
+                    self.focus_step_1 = new_step
+                
+                # Convert discrete step to continuous range for camera API
+                # Map step 0-7 to the configured focus range
+                lens_position = self.focus_range[0] + new_step * (self.focus_range[1] - self.focus_range[0]) / (self.focus_steps - 1)
+                focus_controls = {"LensPosition": int(lens_position)}
+                
+                # Apply focus control if cameras are initialized
+                if self._initialized and Picamera2 and controls:
                     try:
                         camera = self.camera_0 if camera_index == 0 else self.camera_1
                         camera.set_controls(focus_controls)
@@ -324,7 +337,7 @@ class StereoCamera:
                         self.logger.warning(f"Focus control not available on camera {camera_index}: {e}")
                         pass
                 
-                self.logger.info(f"Focus adjusted {direction} for camera {camera_index}: {self.current_focus}")
+                self.logger.info(f"Focus adjusted {direction} for camera {camera_index}: step {new_step} (lens position: {int(lens_position)})")
                 return True
                 
         except Exception as e:
@@ -370,6 +383,55 @@ class StereoCamera:
             self.logger.error(f"Failed to get preview frame from camera {camera_index}: {e}")
             return None
     
+    def get_focus_step(self, camera_index: int = 0) -> int:
+        """
+        Get current focus step for specified camera.
+        Args:
+            camera_index: 0 for camera_0 (left), 1 for camera_1 (right)
+        Returns: current focus step (0-7)
+        """
+        return self.focus_step_0 if camera_index == 0 else self.focus_step_1
+    
+    def set_focus_step(self, step: int, camera_index: int = 0) -> bool:
+        """
+        Set focus step for specified camera.
+        Args:
+            step: focus step (0-7)
+            camera_index: 0 for camera_0 (left), 1 for camera_1 (right)
+        Returns: success status
+        """
+        if not (0 <= step < self.focus_steps):
+            self.logger.error(f"Invalid focus step {step}. Must be 0-{self.focus_steps-1}")
+            return False
+            
+        try:
+            with self._lock:
+                # Update the appropriate step variable
+                if camera_index == 0:
+                    self.focus_step_0 = step
+                else:
+                    self.focus_step_1 = step
+                
+                # Convert discrete step to continuous range for camera API
+                lens_position = self.focus_range[0] + step * (self.focus_range[1] - self.focus_range[0]) / (self.focus_steps - 1)
+                focus_controls = {"LensPosition": int(lens_position)}
+                
+                # Apply focus control if cameras are initialized
+                if self._initialized and Picamera2 and controls:
+                    try:
+                        camera = self.camera_0 if camera_index == 0 else self.camera_1
+                        camera.set_controls(focus_controls)
+                    except Exception as e:
+                        self.logger.warning(f"Focus control not available on camera {camera_index}: {e}")
+                        pass
+                
+                self.logger.info(f"Focus set for camera {camera_index}: step {step} (lens position: {int(lens_position)})")
+                return True
+                
+        except Exception as e:
+            self.logger.error(f"Failed to set focus for camera {camera_index}: {e}")
+            return False
+    
     def cleanup(self) -> None:
         """Clean up camera resources."""
         try:
@@ -401,13 +463,15 @@ class StereoCamera:
             'initialized': self._initialized,
             'camera_0': {
                 'available': self.camera_0 is not None,
-                'type': 'Real Camera' if Picamera2 else 'Mock Camera'
+                'type': 'Real Camera' if Picamera2 else 'Mock Camera',
+                'focus_step': self.focus_step_0
             },
             'camera_1': {
                 'available': self.camera_1 is not None,
-                'type': 'Real Camera' if Picamera2 else 'Mock Camera'
+                'type': 'Real Camera' if Picamera2 else 'Mock Camera',
+                'focus_step': self.focus_step_1
             },
-            'current_focus': self.current_focus,
+            'focus_steps_total': self.focus_steps,
             'current_exposure': self.manual_exposure_time,
             'resolution': self.resolution,
             'framerate': self.framerate

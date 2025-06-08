@@ -13,9 +13,11 @@ camera:
   default_exposure: "auto"
   exposure_range: [100, 800000]  # microseconds
   
-  # Focus settings (if supported)
+  # Focus settings for IMX219 cameras
   autofocus_enabled: false
-  focus_range: [0, 1023]
+  focus_range: [0, 1023]  # Continuous range for API (mapped from discrete steps 0-7)
+  focus_steps: 8  # IMX219 has 8 discrete focus positions (0-7)
+  default_focus_step: 3  # Start at middle position
 
 ui:
   # Main window settings
