@@ -122,14 +122,13 @@ class StereoCamera:
     
     def _configure_camera(self, camera: Any, name: str) -> None:
         """Configure a single camera with optimal settings."""
+        # For OV64A40 cameras, use simpler configuration
         config = {
             "main": {
-                "size": self.resolution,
-                "format": self.format
+                "size": self.resolution
             },
             "lores": {
-                "size": (640, 480),
-                "format": "YUV420"
+                "size": (640, 480)
             },
             "controls": {
                 "FrameRate": self.framerate
