@@ -94,21 +94,41 @@ class StereoCamera:
                 
                 # Initialize camera 0 (left)
                 if Picamera2:
-                    self.camera_0 = Picamera2(self.camera_0_id)
-                    self.camera_1 = Picamera2(self.camera_1_id)
+                    try:
+                        self.logger.info("Creating Picamera2 instances...")
+                        self.camera_0 = Picamera2(self.camera_0_id)
+                        self.camera_1 = Picamera2(self.camera_1_id)
+                        self.logger.info("Picamera2 instances created successfully")
+                    except Exception as e:
+                        self.logger.error(f"Failed to create Picamera2 instances: {e}")
+                        raise
                 else:
                     self.camera_0 = MockCamera(self.camera_0_id)
                     self.camera_1 = MockCamera(self.camera_1_id)
                 
                 # Configure cameras
-                self._configure_camera(self.camera_0, "Camera 0")
-                self._configure_camera(self.camera_1, "Camera 1")
+                try:
+                    self.logger.info("Configuring cameras...")
+                    self._configure_camera(self.camera_0, "Camera 0")
+                    self._configure_camera(self.camera_1, "Camera 1")
+                    self.logger.info("Camera configuration completed")
+                except Exception as e:
+                    self.logger.error(f"Failed to configure cameras: {e}")
+                    raise
                 
                 # Start cameras
-                self.camera_0.start()
-                self.camera_1.start()
+                try:
+                    self.logger.info("Starting cameras...")
+                    self.camera_0.start()
+                    self.logger.info("Camera 0 started")
+                    self.camera_1.start()
+                    self.logger.info("Camera 1 started")
+                except Exception as e:
+                    self.logger.error(f"Failed to start cameras: {e}")
+                    raise
                 
                 # Wait for cameras to stabilize
+                self.logger.info("Waiting for cameras to stabilize...")
                 time.sleep(2)
                 
                 self._initialized = True
@@ -117,20 +137,46 @@ class StereoCamera:
                 
         except Exception as e:
             self.logger.error(f"Failed to initialize cameras: {e}")
+            import traceback
+            self.logger.error(f"Full traceback: {traceback.format_exc()}")
             self.cleanup()
             return False
     
     def _configure_camera(self, camera: Any, name: str) -> None:
         """Configure a single camera with optimal settings."""
-        # For OV64A40 cameras, use minimal configuration
-        config = {
-            "main": {
-                "size": self.resolution
+        try:
+            # For OV64A40 cameras, try the most basic configuration possible
+            # Based on libcamera documentation for OV64A40
+            config = {
+                "main": {
+                    "size": (640, 480),
+                    "format": "RGB888"
+                }
             }
-        }
-        
-        camera.configure(config)
-        self.logger.info(f"{name} configured: {self.resolution} @ {self.framerate}fps")
+            
+            self.logger.info(f"Attempting to configure {name} with config: {config}")
+            camera.configure(config)
+            self.logger.info(f"{name} configured successfully with RGB888 format")
+            
+        except Exception as e:
+            self.logger.error(f"RGB888 configuration failed for {name}: {e}")
+            
+            # Fallback to even simpler configuration
+            try:
+                self.logger.info(f"Trying fallback configuration for {name}")
+                fallback_config = {
+                    "main": {
+                        "size": (640, 480)
+                    }
+                }
+                
+                self.logger.info(f"Fallback config for {name}: {fallback_config}")
+                camera.configure(fallback_config)
+                self.logger.info(f"{name} configured with fallback configuration")
+                
+            except Exception as fallback_error:
+                self.logger.error(f"Fallback configuration also failed for {name}: {fallback_error}")
+                raise
     
     def is_initialized(self) -> bool:
         """Check if cameras are initialized."""
