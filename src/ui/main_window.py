@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional, Tuple
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QLineEdit, QPushButton, QTextEdit, QProgressBar,
-    QMessageBox, QDialog, QFrame, QSizePolicy
+    QMessageBox, QDialog, QFrame, QSizePolicy, QApplication
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QThread
 from PySide6.QtGui import QPixmap, QImage, QFont, QPalette, QColor
@@ -36,9 +36,13 @@ class PreviewUpdateThread(QThread):
         self.running = True
         while self.running:
             if self.camera.is_initialized():
-                frame = self.camera.get_preview_frame()
-                if frame is not None:
-                    self.frame_ready.emit(frame)
+                try:
+                    frame = self.camera.get_preview_frame()
+                    if frame is not None:
+                        self.frame_ready.emit(frame)
+                except Exception as e:
+                    # Log preview errors but don't stop thread
+                    pass
             self.msleep(100)  # 10 FPS preview
             
     def stop(self):
@@ -76,7 +80,12 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_styling()
         self._setup_connections()
-        self._start_preview()
+        
+        # Delay preview start to allow cameras to fully stabilize
+        self.preview_start_timer = QTimer()
+        self.preview_start_timer.timeout.connect(self._start_preview)
+        self.preview_start_timer.setSingleShot(True)
+        self.preview_start_timer.start(3000)  # 3 second delay
         
         # Update storage info periodically
         self.storage_timer = QTimer()
@@ -360,10 +369,14 @@ class MainWindow(QMainWindow):
     def _start_preview(self):
         """Start camera preview."""
         if self.camera.is_initialized():
-            self.preview_thread = PreviewUpdateThread(self.camera)
-            self.preview_thread.frame_ready.connect(self._update_preview)
-            self.preview_thread.start()
-            self._log_status("Camera preview started")
+            try:
+                self.preview_thread = PreviewUpdateThread(self.camera)
+                self.preview_thread.frame_ready.connect(self._update_preview)
+                self.preview_thread.start()
+                self._log_status("Camera preview started")
+            except Exception as e:
+                self.logger.error(f"Failed to start camera preview: {e}")
+                self._log_status("ERROR: Camera preview failed to start")
         else:
             self._log_status("ERROR: Camera not initialized")
     

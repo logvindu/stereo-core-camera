@@ -120,6 +120,11 @@ class StereoCoreCameraApp:
         Returns: True if successful, False otherwise
         """
         try:
+            # Ensure camera system is initialized before creating UI
+            if not self.camera or not self.camera.is_initialized():
+                self.logger.error("Camera system must be initialized before creating main window")
+                return False
+                
             self.main_window = MainWindow(self.config, self.camera, self.storage)
             self.main_window.show()
             
